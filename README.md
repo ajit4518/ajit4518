@@ -1,4 +1,4 @@
-# Hi, I'm Ajit Zod 👋
+# Hi, I'm Ajit 👋
 
 **Senior Data Engineer** based in Mumbai · 3+ years building production data systems across **AWS, GCP, and Azure**
 
@@ -75,7 +75,6 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 ## Find me
 
 [![Portfolio](https://img.shields.io/badge/Portfolio-ajit4518.github.io-orange?style=flat)](https://ajit4518.github.io)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-ajitzod-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://linkedin.com/in/ajitzod)
 [![Email](https://img.shields.io/badge/Email-zodajit%40gmail.com-D44638?style=flat&logo=gmail&logoColor=white)](mailto:zodajit@gmail.com)
 
-> Open to **remote** Senior Data Engineer roles and freelance Upwork engagements worldwide.
+> Open to **remote** or onsite Senior Data Engineer roles and freelance engagements worldwide.
