@@ -75,6 +75,5 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 ## Find me
 
 [![Portfolio](https://img.shields.io/badge/Portfolio-ajit4518.github.io-orange?style=flat)](https://ajit4518.github.io)
-[![Email](https://img.shields.io/badge/Email-zodajit%40gmail.com-D44638?style=flat&logo=gmail&logoColor=white)](mailto:zodajit@gmail.com)
 
 > Open to **remote** or onsite Senior Data Engineer roles and freelance engagements worldwide.
