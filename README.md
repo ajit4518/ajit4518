@@ -60,15 +60,15 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 
 | Project | What it does | Stack |
 |---|---|---|
-| [realtime-cdc-pipeline](https://github.com/ajit4518/realtime-cdc-pipeline) | Postgres WAL → Kafka → Iceberg with MERGE INTO upserts | Debezium · Kafka · Spark · Iceberg |
-| [shopify-bigquery-analytics](https://github.com/ajit4518/shopify-bigquery-analytics) | Incremental Shopify ingestion + dbt LTV models + webhook Cloud Function | Shopify API · BigQuery · dbt · GCP |
-| [data-observability-framework](https://github.com/ajit4518/data-observability-framework) | Z-score volume · freshness SLA · null-rate monitors with Slack alerts | BigQuery · Python · DataOps |
-| [multi-source-etl-framework](https://github.com/ajit4518/multi-source-etl-framework) | YAML-driven ETL: REST/Sheets/Airtable → BigQuery with upsert support | Python · BigQuery · Airflow |
-| [snowflake-cost-optimizer](https://github.com/ajit4518/snowflake-cost-optimizer) | Query profiler · warehouse right-sizer · clustering advisor · Streamlit dashboard | Snowflake · Python · Streamlit |
-| [text-to-sql-assistant](https://github.com/ajit4518/text-to-sql-assistant) | NL → SQL with schema RAG, safety guardrails, FastAPI service | LLM · FastAPI · DuckDB · BigQuery |
-| [content-performance-data-model](https://github.com/ajit4518/content-performance-data-model) | dbt staging→mart pipeline with custom macros and composite engagement scoring | dbt · DuckDB · BigQuery |
-| [content-launch-prediction-pipeline](https://github.com/ajit4518/content-launch-prediction-pipeline) | PySpark features → XGBoost classifier → Airflow orchestration | PySpark · XGBoost · Airflow · Docker |
-| [nifty50-bigquery-pipeline](https://github.com/ajit4518/nifty50-bigquery-pipeline) | Serverless daily stock snapshot — full Terraform IaC on GCP | Cloud Run · BigQuery · Terraform |
+| [realtime-cdc-pipeline](https://github.com/ajit-data-ai/realtime-cdc-pipeline) | Postgres WAL → Kafka → Iceberg with MERGE INTO upserts | Debezium · Kafka · Spark · Iceberg |
+| [shopify-bigquery-analytics](https://github.com/ajit-data-ai/shopify-bigquery-analytics) | Incremental Shopify ingestion + dbt LTV models + webhook Cloud Function | Shopify API · BigQuery · dbt · GCP |
+| [data-observability-framework](https://github.com/ajit-data-ai/data-observability-framework) | Z-score volume · freshness SLA · null-rate monitors with Slack alerts | BigQuery · Python · DataOps |
+| [multi-source-etl-framework](https://github.com/ajit-data-ai/multi-source-etl-framework) | YAML-driven ETL: REST/Sheets/Airtable → BigQuery with upsert support | Python · BigQuery · Airflow |
+| [snowflake-cost-optimizer](https://github.com/ajit-data-ai/snowflake-cost-optimizer) | Query profiler · warehouse right-sizer · clustering advisor · Streamlit dashboard | Snowflake · Python · Streamlit |
+| [text-to-sql-assistant](https://github.com/ajit-data-ai/text-to-sql-assistant) | NL → SQL with schema RAG, safety guardrails, FastAPI service | LLM · FastAPI · DuckDB · BigQuery |
+| [content-performance-data-model](https://github.com/ajit-data-ai/content-performance-data-model) | dbt staging→mart pipeline with custom macros and composite engagement scoring | dbt · DuckDB · BigQuery |
+| [content-launch-prediction-pipeline](https://github.com/ajit-data-ai/content-launch-prediction-pipeline) | PySpark features → XGBoost classifier → Airflow orchestration | PySpark · XGBoost · Airflow · Docker |
+| [nifty50-bigquery-pipeline](https://github.com/ajit-data-ai/nifty50-bigquery-pipeline) | Serverless daily stock snapshot — full Terraform IaC on GCP | Cloud Run · BigQuery · Terraform |
 
 ---
 
