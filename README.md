@@ -8,10 +8,10 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 
 ## What I build
 
-- **Streaming pipelines** — Kafka, Debezium CDC, Spark Structured Streaming, Apache Iceberg
-- **Cloud data platforms** — medallion architectures on AWS (S3/Glue/Redshift) and GCP (BigQuery/Cloud Run)
-- **Analytics engineering** — dbt models, data observability frameworks, cost optimisation tooling
-- **ML pipelines** — PySpark feature engineering, XGBoost, Airflow orchestration, Vertex AI
+- **Streaming pipelines**: Kafka, Debezium CDC, Spark Structured Streaming, Apache Iceberg
+- **Cloud data platforms**: medallion architectures on AWS (S3/Glue/Redshift) and GCP (BigQuery/Cloud Run)
+- **Analytics engineering**: dbt models, data observability frameworks, cost optimisation tooling
+- **ML pipelines**: PySpark feature engineering, XGBoost, Airflow orchestration, Vertex AI
 
 ---
 
@@ -68,7 +68,7 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 | [text-to-sql-assistant](https://github.com/ajit-data-ai/text-to-sql-assistant) | NL → SQL with schema RAG, safety guardrails, FastAPI service | LLM · FastAPI · DuckDB · BigQuery |
 | [content-performance-data-model](https://github.com/ajit-data-ai/content-performance-data-model) | dbt staging→mart pipeline with custom macros and composite engagement scoring | dbt · DuckDB · BigQuery |
 | [content-launch-prediction-pipeline](https://github.com/ajit-data-ai/content-launch-prediction-pipeline) | PySpark features → XGBoost classifier → Airflow orchestration | PySpark · XGBoost · Airflow · Docker |
-| [nifty50-bigquery-pipeline](https://github.com/ajit-data-ai/nifty50-bigquery-pipeline) | Serverless daily stock snapshot — full Terraform IaC on GCP | Cloud Run · BigQuery · Terraform |
+| [nifty50-bigquery-pipeline](https://github.com/ajit-data-ai/nifty50-bigquery-pipeline) | Serverless daily stock snapshot with full Terraform IaC on GCP | Cloud Run · BigQuery · Terraform |
 
 ---
 
