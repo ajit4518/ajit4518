@@ -51,6 +51,7 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 
 ![Databricks Pro DE](https://img.shields.io/badge/Databricks-Professional%20DE-FF3621?style=flat&logo=databricks&logoColor=white)
 ![Databricks Assoc DE](https://img.shields.io/badge/Databricks-Associate%20DE-FF3621?style=flat&logo=databricks&logoColor=white)
+![Databricks GenAI](https://img.shields.io/badge/Databricks-GenAI%20Engineer-FF3621?style=flat&logo=databricks&logoColor=white)
 ![GCP Pro DE](https://img.shields.io/badge/GCP-Professional%20DE-4285F4?style=flat&logo=googlecloud&logoColor=white)
 ![GCP Pro MLE](https://img.shields.io/badge/GCP-Professional%20MLE-4285F4?style=flat&logo=googlecloud&logoColor=white)
 
