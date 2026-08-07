@@ -66,17 +66,3 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 An end-to-end personalization and playback-quality platform for a streaming service. Postgres CDC through Kafka into Flink, which sessionizes viewing in real time and publishes features that a two-stage ranker serves at p99 under 50 ms on EKS. The same feature definitions are rebuilt in dbt with point-in-time correctness for training, and a daily parity test keeps the two paths from drifting apart.
 
 `Flink` · `Kafka` · `Debezium` · `dbt` · `Airflow` · `Kubernetes` · `Terraform` · `LightGBM`
-
----
-
-## More projects
-
-The rest of my open-source data engineering work lives at **[@ajit-data-ai](https://github.com/ajit-data-ai)** — CDC pipelines, marketing and product analytics stacks, a Databricks lakehouse template, data observability tooling, and a Snowflake cost optimizer.
-
----
-
-## Find me
-
-[![Portfolio](https://img.shields.io/badge/Portfolio-ajit4518.github.io-orange?style=flat)](https://ajit4518.github.io)
-
-> Open to **remote** or onsite Senior Data Engineer roles and freelance engagements worldwide.
