@@ -8,10 +8,10 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 
 ## What I build
 
-- **Streaming pipelines**: Kafka, Debezium CDC, Spark Structured Streaming, Apache Iceberg
+- **Streaming pipelines**: Kafka, Debezium CDC, Flink and Spark Structured Streaming, Apache Iceberg
 - **Cloud data platforms**: medallion architectures on AWS (S3/Glue/Redshift) and GCP (BigQuery/Cloud Run)
 - **Analytics engineering**: dbt models, data observability frameworks, cost optimisation tooling
-- **ML pipelines**: PySpark feature engineering, XGBoost, Airflow orchestration, Vertex AI
+- **ML platforms**: point-in-time feature stores, ranking models, and the serving path that keeps them honest
 
 ---
 
@@ -27,6 +27,7 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 **Streaming & Lakehouse**
 
 ![Apache Kafka](https://img.shields.io/badge/Kafka-231F20?style=flat&logo=apachekafka&logoColor=white)
+![Apache Flink](https://img.shields.io/badge/Flink-E6526F?style=flat&logo=apacheflink&logoColor=white)
 ![Apache Spark](https://img.shields.io/badge/Spark-E25A1C?style=flat&logo=apachespark&logoColor=white)
 ![Apache Iceberg](https://img.shields.io/badge/Iceberg-informational?style=flat)
 ![Debezium](https://img.shields.io/badge/Debezium-red?style=flat)
@@ -39,13 +40,14 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 ![Azure](https://img.shields.io/badge/Azure-0078D4?style=flat&logo=microsoftazure&logoColor=white)
 ![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=flat&logo=databricks&logoColor=white)
 
-**Analytics Engineering**
+**Analytics Engineering & Platform**
 
 ![dbt](https://img.shields.io/badge/dbt-FF694B?style=flat&logo=dbt&logoColor=white)
 ![BigQuery](https://img.shields.io/badge/BigQuery-4285F4?style=flat&logo=googlebigquery&logoColor=white)
 ![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?style=flat&logo=snowflake&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-017CEE?style=flat&logo=apacheairflow&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=flat&logo=terraform&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white)
 
 **Certifications**
 
@@ -57,19 +59,19 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 
 ---
 
-## Featured projects
+## Current work
 
-| Project | What it does | Stack |
-|---|---|---|
-| [realtime-cdc-pipeline](https://github.com/ajit-data-ai/realtime-cdc-pipeline) | Postgres WAL → Kafka → Iceberg with MERGE INTO upserts | Debezium · Kafka · Spark · Iceberg |
-| [shopify-bigquery-analytics](https://github.com/ajit-data-ai/shopify-bigquery-analytics) | Incremental Shopify ingestion + dbt LTV models + webhook Cloud Function | Shopify API · BigQuery · dbt · GCP |
-| [data-observability-framework](https://github.com/ajit-data-ai/data-observability-framework) | Z-score volume · freshness SLA · null-rate monitors with Slack alerts | BigQuery · Python · DataOps |
-| [multi-source-etl-framework](https://github.com/ajit-data-ai/multi-source-etl-framework) | YAML-driven ETL: REST/Sheets/Airtable → BigQuery with upsert support | Python · BigQuery · Airflow |
-| [snowflake-cost-optimizer](https://github.com/ajit-data-ai/snowflake-cost-optimizer) | Query profiler · warehouse right-sizer · clustering advisor · Streamlit dashboard | Snowflake · Python · Streamlit |
-| [text-to-sql-assistant](https://github.com/ajit-data-ai/text-to-sql-assistant) | NL → SQL with schema RAG, safety guardrails, FastAPI service | LLM · FastAPI · DuckDB · BigQuery |
-| [content-performance-data-model](https://github.com/ajit-data-ai/content-performance-data-model) | dbt staging→mart pipeline with custom macros and composite engagement scoring | dbt · DuckDB · BigQuery |
-| [content-launch-prediction-pipeline](https://github.com/ajit-data-ai/content-launch-prediction-pipeline) | PySpark features → XGBoost classifier → Airflow orchestration | PySpark · XGBoost · Airflow · Docker |
-| [nifty50-bigquery-pipeline](https://github.com/ajit-data-ai/nifty50-bigquery-pipeline) | Serverless daily stock snapshot with full Terraform IaC on GCP | Cloud Run · BigQuery · Terraform |
+**[realtime-personalization-platform](https://github.com/ajit4518/realtime-personalization-platform)**
+
+An end-to-end personalization and playback-quality platform for a streaming service. Postgres CDC through Kafka into Flink, which sessionizes viewing in real time and publishes features that a two-stage ranker serves at p99 under 50 ms on EKS. The same feature definitions are rebuilt in dbt with point-in-time correctness for training, and a daily parity test keeps the two paths from drifting apart.
+
+`Flink` · `Kafka` · `Debezium` · `dbt` · `Airflow` · `Kubernetes` · `Terraform` · `LightGBM`
+
+---
+
+## More projects
+
+The rest of my open-source data engineering work lives at **[@ajit-data-ai](https://github.com/ajit-data-ai)** — CDC pipelines, marketing and product analytics stacks, a Databricks lakehouse template, data observability tooling, and a Snowflake cost optimizer.
 
 ---
 
