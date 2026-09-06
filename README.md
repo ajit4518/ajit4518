@@ -58,11 +58,3 @@ Currently at BookMyShow, shipping data pipelines that finance, payments, and pro
 ![GCP Pro MLE](https://img.shields.io/badge/GCP-Professional%20MLE-4285F4?style=flat&logo=googlecloud&logoColor=white)
 
 ---
-
-## Current work
-
-**[realtime-personalization-platform](https://github.com/ajit4518/realtime-personalization-platform)**
-
-An end-to-end personalization and playback-quality platform for a streaming service. Postgres CDC through Kafka into Flink, which sessionizes viewing in real time and publishes features that a two-stage ranker serves at p99 under 50 ms on EKS. The same feature definitions are rebuilt in dbt with point-in-time correctness for training, and a daily parity test keeps the two paths from drifting apart.
-
-`Flink` · `Kafka` · `Debezium` · `dbt` · `Airflow` · `Kubernetes` · `Terraform` · `LightGBM`
