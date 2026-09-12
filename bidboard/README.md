@@ -39,9 +39,14 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ## Checks
 
 ```bash
-npm test                 # 14 unit tests over the pure bidding rules
-node scripts/verify.mjs  # end-to-end: validation, concurrency, idempotency, clicks
+npm test                 # 21 unit tests: bidding rules, challenge codes, PKCE
+node scripts/verify.mjs  # 26 end-to-end checks against a running server
 ```
+
+The end-to-end suite covers the ownership gate (an unverified visitor cannot
+bid; a verified user cannot bid on someone else's handle; a handle cannot be
+claimed twice), the bio-code flow, bid validation, concurrent bids, webhook
+replay, takedown, and click counting.
 
 ## The rules
 
@@ -106,15 +111,64 @@ are shown on the board. This is not decoration: outbid.lol's repeat five-figure
 bids happened because bidders could point at trials and signups. Without
 receipts you get one round of novelty money and then silence.
 
+## Ownership verification
+
+**You can only bid on an account you control.** This is enforced server-side in
+`/api/checkout`, not just in the UI — the form only offers verified handles, but
+the API re-checks the claim on every request regardless.
+
+Two ways to prove it:
+
+**Sign in with the platform (preferred).** OAuth 2.0 with PKCE for X, YouTube
+(via Google) and TikTok. The platform tells us who you are, so nothing has to be
+published or read back. Each provider is inert until its client id and secret are
+set, and the sign-in button says so.
+
+**Publish a one-time code (fallback).** We issue `bidboard-verify-<10 hex>`, you
+put it anywhere in your bio, we read it back. Matching tolerates the ways
+platforms mangle bios — case, whitespace, zero-width characters — but requires
+the full code.
+
+Instagram and LinkedIn are code-only on purpose. Instagram handle verification
+needs the Facebook Graph API against a Business account, behind App Review and
+business verification. LinkedIn *company page* control needs `r_organization_admin`,
+which is partner-gated; plain sign-in only proves who the person is. Neither is
+something a new project can self-serve, so the fallback carries them.
+
+`UNIQUE (platform, handle)` on `account_claims` means one owner per handle and
+first proof wins — a second person proving control of the same account is
+rejected rather than silently taking over the listing.
+
+Verifying also adopts any existing listing for that handle, so accounts listed
+before verification existed can be claimed by their real owner.
+
+### Takedown
+
+`POST /api/listings/report` files a removal request and **immediately hides**
+any listing that is not owner-verified. Unverified listings of someone else's
+account get taken down first and adjudicated second.
+
+### Sessions
+
+An opaque 32-byte token in an httpOnly cookie, looked up in `sessions`. Nothing
+is signed into the cookie, so there is no signing key to leak or rotate.
+
+## Local testing without any platform credentials
+
+Two dev-only seams, both gated on `ALLOW_MOCK_OAUTH=1` and refused when
+`NODE_ENV=production`:
+
+- `GET /api/auth/mock/start?platform=x&handle=foo` creates a verified claim.
+  It calls the same `upsertClaim()` the real callback uses, so exercising it
+  tests the production path rather than a stub.
+- `MOCK_BIO_FILE=/path/to/file` makes the bio fetcher read that file instead of
+  the live profile, which is how the code-challenge flow is tested end to end.
+
 ## Not built yet
 
-Deliberately out of scope for a prototype, and all of it matters before launch:
-
-- **Ownership verification.** Anyone can currently list any handle. Listing a
-  *person's* account on a public ranked board they never opted into is a real
-  moderation and legal problem, unlike listing a product. Platform OAuth or a
-  claim/takedown flow is required, not optional.
-- Refund and removal tooling, plus an admin view for `hidden` / `removed`.
+- Rate limiting on checkout and challenge creation beyond the per-challenge
+  attempt cap.
+- Refund tooling and an admin view for `removal_requests` and hidden listings.
 - Avatar fetching and profile-existence checks at submission time.
-- Rate limiting on checkout creation.
 - Reserved-handle blocklist for well-known accounts.
+- Terms of service and privacy policy — required before taking real money.

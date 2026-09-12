@@ -67,5 +67,24 @@ for (const [platform, handle, name, cat, tagline, cents] of demo) {
   );
 }
 
-console.log(`seeded ${demo.length} listings`);
+// Give every demo listing a verified owner, so the seeded board reflects the
+// rule the app now enforces: nothing is listed without proven ownership.
+const demoUser = await client.query(
+  "INSERT INTO users (email) VALUES ('demo@bidboard.local') RETURNING id",
+);
+const ownerId = demoUser.rows[0].id;
+
+for (const [platform, handle] of demo) {
+  await client.query(
+    `INSERT INTO account_claims (user_id, platform, handle, method)
+     VALUES ($1,$2,$3,'seed') ON CONFLICT (platform, handle) DO NOTHING`,
+    [ownerId, platform, handle],
+  );
+  await client.query(
+    "UPDATE listings SET owner_user_id = $1, verified = true WHERE platform = $2 AND handle = $3",
+    [ownerId, platform, handle],
+  );
+}
+
+console.log(`seeded ${demo.length} listings, all owner-verified`);
 await client.end();
