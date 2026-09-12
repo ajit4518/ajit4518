@@ -148,20 +148,61 @@ const edge = await carol.post("/api/checkout", {
 check("$1 over the leader is refused", edge.status === 400, edge.body?.error);
 
 // -------------------------------------------------------------- concurrency
-section("concurrency: two simultaneous bids on one handle");
+section("concurrency");
 
-const dave = actor();
-const daveHandle = `dave${uniq()}`;
-await dave.get(`/api/auth/mock/start?platform=x&handle=${daveHandle}`);
+// The real no-lost-update property lives in SETTLEMENT, not checkout.
+// Two payments that land at the same instant must both be added to the
+// total; neither may overwrite the other.
+const addHandle = `add${uniq()}`;
+const mkSub = async (cents) =>
+  (await client.query(
+    `INSERT INTO submissions (platform, handle, display_name, profile_url, category_id, amount_cents)
+     VALUES ('x', $1, 'Additive', 'https://x.com/' || $1, $2, $3) RETURNING id`,
+    [addHandle, catId, cents],
+  )).rows[0].id;
 
-const before = await total("x", daveHandle);
-const [r1, r2] = await Promise.all([
-  dave.post("/api/checkout", { platform: "x", handle: daveHandle, displayName: "Dave", categoryId: catId, bid: "50" }),
-  dave.post("/api/checkout", { platform: "x", handle: daveHandle, displayName: "Dave", categoryId: catId, bid: "50" }),
+const [s1, s2] = [await mkSub(3000), await mkSub(4500)];
+const settle = actor();
+await Promise.all([
+  settle.post("/api/dev/simulate", { submissionId: s1 }),
+  settle.post("/api/dev/simulate", { submissionId: s2 }),
 ]);
-const after = await total("x", daveHandle);
-check("both requests were accepted", r1.status === 200 && r2.status === 200);
-check("both payments counted, none lost", after - before === 10000, `${before} -> ${after} cents`);
+const settled = await total("x", addHandle);
+check("two payments settling at once are both added, neither lost",
+  settled === 7500, `expected 7500, got ${settled} cents`);
+
+// And the property that removes the "race for #1" entirely: two bidders
+// paying the SAME amount for different handles both succeed. Nobody is
+// competing for a slot, so nobody has to be refunded — they are sorted,
+// oldest first on a tie.
+const eve = actor(), frank = actor();
+const eveH = `eve${uniq()}`, frankH = `frank${uniq()}`;
+await eve.get(`/api/auth/mock/start?platform=x&handle=${eveH}`);
+await frank.get(`/api/auth/mock/start?platform=x&handle=${frankH}`);
+
+const [er, fr] = await Promise.all([
+  eve.post("/api/checkout", { platform: "x", handle: eveH, displayName: "Eve Co", categoryId: catId, bid: "75" }),
+  frank.post("/api/checkout", { platform: "x", handle: frankH, displayName: "Frank Co", categoryId: catId, bid: "75" }),
+]);
+check("two bidders paying the same amount both succeed",
+  er.status === 200 && fr.status === 200, `${er.status}/${fr.status}`);
+check("both were charged in full",
+  (await total("x", eveH)) === 7500 && (await total("x", frankH)) === 7500);
+
+const tie = await client.query(
+  `SELECT handle FROM listings WHERE handle IN ($1,$2)
+   ORDER BY total_cents DESC, COALESCE(first_bid_at, created_at) ASC`, [eveH, frankH]);
+check("a tie is broken by age, not by who is refunded",
+  tie.rows.length === 2 && tie.rows[0].handle === eveH,
+  `order: ${tie.rows.map((r) => r.handle).join(", ")}`);
+
+// A second identical bid on your OWN listing is a no-op raise and must be
+// refused, not silently charged again.
+const repeat = await eve.post("/api/checkout",
+  { platform: "x", handle: eveH, displayName: "Eve Co", categoryId: catId, bid: "75" });
+check("re-bidding the same amount on your own listing is refused",
+  repeat.status === 400, repeat.body?.error);
+check("and nothing extra was charged", (await total("x", eveH)) === 7500);
 
 // -------------------------------------------------------------- idempotency
 section("idempotency: one webhook event delivered twice");

@@ -6,7 +6,7 @@ import { createSession, setSessionCookie, upsertUser } from "@/lib/auth";
 import { upsertClaim } from "@/lib/verification";
 import { isPlatform } from "@/lib/platforms";
 import { normalizeHandle } from "@/lib/rules";
-import { BASE_URL } from "@/lib/config";
+import { BASE_URL, ALLOW_MOCK_OAUTH } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ provider: strin
   // Dev-only shortcut. It deliberately calls the SAME upsertClaim() the real
   // callback uses, so exercising it proves the production path, not a stub.
   if (provider === "mock") {
-    if (process.env.ALLOW_MOCK_OAUTH !== "1" || process.env.NODE_ENV === "production") {
+    if (!ALLOW_MOCK_OAUTH) {
       return NextResponse.json({ error: "Not available." }, { status: 404 });
     }
     const platform = url.searchParams.get("platform");

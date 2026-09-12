@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordClickAndGetTarget } from "@/lib/bids";
+import { BASE_URL } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,10 +14,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
 
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    return NextResponse.redirect(new URL("/", process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"));
+    return NextResponse.redirect(new URL("/", BASE_URL));
   }
 
   const target = await recordClickAndGetTarget(id);
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-  return NextResponse.redirect(target ?? new URL("/", base).toString(), { status: 302 });
+  return NextResponse.redirect(target ?? new URL("/", BASE_URL).toString(), { status: 302 });
 }

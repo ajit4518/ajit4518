@@ -1,5 +1,6 @@
 import type { Platform } from "./rules";
 import { profileUrlFor } from "./platforms";
+import { ALLOW_MOCK_OAUTH } from "./config";
 
 export type ProfileFetcher = (platform: Platform, handle: string) => Promise<string>;
 
@@ -50,7 +51,7 @@ export function setProfileFetcher(f: ProfileFetcher | null) {
 export function getProfileFetcher(): ProfileFetcher {
   if (override) return override;
   const mockPath = process.env.MOCK_BIO_FILE;
-  if (mockPath && process.env.ALLOW_MOCK_OAUTH === "1" && process.env.NODE_ENV !== "production") {
+  if (mockPath && ALLOW_MOCK_OAUTH) {
     return mockFileFetcher(mockPath);
   }
   return httpProfileFetcher;

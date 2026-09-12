@@ -48,7 +48,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ```bash
 npm test                 # 21 unit tests: bidding rules, challenge codes, PKCE
-node scripts/verify.mjs  # 43 end-to-end checks against a running server
+node scripts/verify.mjs  # 46 end-to-end checks against a running server
 ```
 
 The end-to-end suite covers the ownership gate (an unverified visitor cannot
@@ -56,8 +56,22 @@ bid; a verified user cannot bid on someone else's handle; a handle cannot be
 claimed twice), the free-listing path (open submission, no self-set bid
 amount, no duplicates, no implied right to bid), geography (city pages,
 filters, paid-above-free ordering, sitemap and robots), the bio-code flow, bid
-validation, concurrent bids, webhook replay, takedown, rate limiting, and
-click counting.
+validation, settlement concurrency, webhook replay, takedown, rate limiting,
+and click counting.
+
+### What the concurrency checks actually prove
+
+The no-lost-update property lives in **settlement**, not checkout. The suite
+applies two payments to the same listing simultaneously and asserts the total
+is their sum, so neither overwrites the other.
+
+Separately it asserts the property that removes the "race for #1": two bidders
+paying the *same* amount for different handles both succeed and are ordered by
+age. Nobody is competing for a slot, so nobody needs refunding.
+
+Two identical bids on the *same* listing is not that race — it is a no-op
+raise, and the second is correctly refused rather than charged twice. The
+suite asserts that too.
 
 ## The rules
 
@@ -88,6 +102,10 @@ nobody is competing for a slot — they are sorted, both keep their money, and
 `applyPaidBid()` has **no rejection path**. It deliberately does not re-check
 "is this still enough for #1" at settlement time. The `planBid()` check at
 checkout is advisory only.
+
+Note what this does *not* mean: two identical bids on the **same** listing are
+not a race at all. That is a no-op raise, and the second is refused by the
+`+$1` rule rather than charged twice.
 
 **Money is added, never assigned.** The webhook adds the delta that was
 charged; it never sets a total computed at checkout time. Two concurrent
@@ -216,6 +234,32 @@ Two dev-only seams, both gated on `ALLOW_MOCK_OAUTH=1` and refused when
   tests the production path rather than a stub.
 - `MOCK_BIO_FILE=/path/to/file` makes the bio fetcher read that file instead of
   the live profile, which is how the code-challenge flow is tested end to end.
+
+## Production safety
+
+The app **refuses to serve** if it is misconfigured in production
+(`productionConfigProblems()` in `src/lib/config.ts`, invoked from
+`instrumentation.ts` at boot). It checks for a database URL, a live Stripe key
+and webhook secret, an https origin, and that no dev flag leaked into the
+deploy. A bad deploy fails loudly at start rather than quietly at the first
+payment.
+
+Three hazards this closes, all found by actually running a production build:
+
+- **Simulated payments must fail closed.** `SIMULATED_PAYMENTS` used to be
+  derived from "no Stripe key", so a production deploy with a missing or
+  mistyped key would have handed out the #1 position for free. In production it
+  is now always false and checkout returns 503 instead.
+- **`APP_BASE_URL`, not `NEXT_PUBLIC_BASE_URL`.** `NEXT_PUBLIC_*` values are
+  inlined at *build* time, so an origin supplied only at run time is silently
+  ignored and the deploy keeps the build machine's — which sends live customers
+  to a localhost Stripe redirect. Only server code needs the origin, so it is
+  read at run time.
+- **`sitemap.xml` and `robots.txt` are dynamic.** Prerendered, they baked in the
+  build origin; the sitemap also depends on which cities have listings, which
+  changes as they arrive.
+
+See `DEPLOY.md`.
 
 ## Not built yet
 

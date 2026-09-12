@@ -3,6 +3,11 @@ import { getPopulatedCities } from "@/lib/geo";
 import { getCategories } from "@/lib/bids";
 import { BASE_URL } from "@/lib/config";
 
+// Must NOT be statically prerendered. It depends on APP_BASE_URL, which is
+// read at run time, and on which cities currently have listings, which changes
+// as they arrive. Prerendering bakes in the build machine's origin — that is
+// how a sitemap ships full of localhost URLs.
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 /**

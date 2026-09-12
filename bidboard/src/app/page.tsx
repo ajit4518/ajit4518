@@ -118,6 +118,10 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
         Paid listings rank above free ones, by cumulative dollars paid. Free listings
         follow, oldest first. Anyone can <Link href="/add">add an account</Link>; only a
         verified owner can bid.
+        <div style={{ marginTop: 10 }}>
+          <Link href="/rules">Rules</Link> · <Link href="/terms">Terms</Link> ·{" "}
+          <Link href="/privacy">Privacy</Link>
+        </div>
       </footer>
     </div>
   );

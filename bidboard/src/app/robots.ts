@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
 import { BASE_URL } from "@/lib/config";
 
+// Reads APP_BASE_URL at run time; prerendering would bake in the build origin.
+export const dynamic = "force-dynamic";
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [

@@ -5,7 +5,7 @@ import {
 } from "@/lib/bids";
 import { isPlatform, platformLabel, profileUrlFor } from "@/lib/platforms";
 import { normalizeHandle, planBid, usdToCents, centsToUsd } from "@/lib/rules";
-import { BASE_URL, SIMULATED_PAYMENTS } from "@/lib/config";
+import { BASE_URL, SIMULATED_PAYMENTS, STRIPE_CONFIGURED } from "@/lib/config";
 import { currentUser } from "@/lib/auth";
 import { hasClaim, claimOwner } from "@/lib/verification";
 import { stripe } from "@/lib/stripe";
@@ -85,8 +85,18 @@ export async function POST(req: Request) {
     payerEmail: String(email ?? "").trim() || null,
   });
 
-  // No Stripe key configured: stub the payment so the engine can be exercised
-  // end to end. The code path below is identical to the webhook's.
+  // Fail closed. In production SIMULATED_PAYMENTS is always false, so a
+  // deploy with a missing Stripe key refuses to take bids rather than
+  // handing out rank for nothing.
+  if (!SIMULATED_PAYMENTS && !STRIPE_CONFIGURED) {
+    return NextResponse.json(
+      { error: "Payments are not configured on this deployment." },
+      { status: 503 },
+    );
+  }
+
+  // Development only: stub the payment so the engine can be exercised end to
+  // end. The code path below is identical to the webhook's.
   if (SIMULATED_PAYMENTS) {
     const result = await applyPaidBid({
       eventId: `sim_${randomUUID()}`,
