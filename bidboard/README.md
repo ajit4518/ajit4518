@@ -1,11 +1,19 @@
 # BidBoard
 
-A pay-to-rank leaderboard for social accounts, in the shape of
-[outbid.lol](https://outbid.lol) but scoped to a **single commercial vertical**
-with **per-platform boards**.
+A geographic directory of brand social accounts with a pay-to-rank layer on
+top. Browse by country and city, filter by platform and category, and rank by
+what you have paid.
 
-Rank is set by one number: cumulative dollars paid. No algorithm, no editorial,
-no ads.
+Two tiers:
+
+- **Free** — anyone adds an account by pasting a username or profile link. No
+  login, no payment.
+- **Paid** — the *verified owner* bids to rank above the free tier.
+
+That split is the whole design. Gating submission starves a directory's supply
+side, but letting anyone pay to position an account they do not own is exactly
+the abuse the ownership gate exists to stop. So submission is open and only
+*ranking* is gated.
 
 ## Why a vertical instead of a general board
 
@@ -19,7 +27,14 @@ studios, newsletter and course operators). For them an inbound lead is worth
 four figures, so a four-figure bid has arithmetic behind it rather than ego.
 Change `src/lib/config.ts` and `db/seed.sql` to retarget the vertical.
 
-## Running it
+## Deploying
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ajit4518/ajit4518&root-directory=bidboard&project-name=agencyboard&repository-name=agencyboard&env=DATABASE_URL,APP_BASE_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET&envDescription=Postgres+URL,+your+public+https+origin,+and+live+Stripe+keys.+The+app+refuses+to+start+without+all+four.&envLink=https://github.com/ajit4518/ajit4518/blob/master/bidboard/DEPLOY.md)
+
+See [DEPLOY.md](./DEPLOY.md) — roughly fifteen minutes. Merge the open PR
+first; the button deploys the default branch.
+
+## Running it locally
 
 ```bash
 cp .env.example .env          # defaults work against a local Postgres
@@ -39,9 +54,31 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ## Checks
 
 ```bash
-npm test                 # 14 unit tests over the pure bidding rules
-node scripts/verify.mjs  # end-to-end: validation, concurrency, idempotency, clicks
+npm test                 # 21 unit tests: bidding rules, challenge codes, PKCE
+node scripts/verify.mjs  # 46 end-to-end checks against a running server
 ```
+
+The end-to-end suite covers the ownership gate (an unverified visitor cannot
+bid; a verified user cannot bid on someone else's handle; a handle cannot be
+claimed twice), the free-listing path (open submission, no self-set bid
+amount, no duplicates, no implied right to bid), geography (city pages,
+filters, paid-above-free ordering, sitemap and robots), the bio-code flow, bid
+validation, settlement concurrency, webhook replay, takedown, rate limiting,
+and click counting.
+
+### What the concurrency checks actually prove
+
+The no-lost-update property lives in **settlement**, not checkout. The suite
+applies two payments to the same listing simultaneously and asserts the total
+is their sum, so neither overwrites the other.
+
+Separately it asserts the property that removes the "race for #1": two bidders
+paying the *same* amount for different handles both succeed and are ordered by
+age. Nobody is competing for a slot, so nobody needs refunding.
+
+Two identical bids on the *same* listing is not that race — it is a no-op
+raise, and the second is correctly refused rather than charged twice. The
+suite asserts that too.
 
 ## The rules
 
@@ -72,6 +109,10 @@ nobody is competing for a slot — they are sorted, both keep their money, and
 `applyPaidBid()` has **no rejection path**. It deliberately does not re-check
 "is this still enough for #1" at settlement time. The `planBid()` check at
 checkout is advisory only.
+
+Note what this does *not* mean: two identical bids on the **same** listing are
+not a race at all. That is a no-op raise, and the second is refused by the
+`+$1` rule rather than charged twice.
 
 **Money is added, never assigned.** The webhook adds the delta that was
 charged; it never sets a total computed at checkout time. Two concurrent
@@ -106,15 +147,132 @@ are shown on the board. This is not decoration: outbid.lol's repeat five-figure
 bids happened because bidders could point at trials and signups. Without
 receipts you get one round of novelty money and then silence.
 
+## Geography
+
+Listings carry an optional country and city. Three surfaces use it:
+
+- `/` — country, city, platform, category and brand/person filters
+- `/in/<country>/<city>` — a real ranked page per city, the SEO surface
+- `/directory` — index of cities, **populated ones only**
+
+A directory's distribution is long-tail search ("social media agencies in
+mumbai"), not virality. That only works if the pages are real: the sitemap
+lists a city only once it has listings, and category pages only once a city has
+five or more. Publishing a page per city x category upfront would be thousands
+of thin URLs, which hurts rather than helps.
+
+Cities are a curated list ordered by `sort_order`, so the strongest markets
+surface first rather than alphabetically.
+
+### Ranking across the two tiers
+
+```sql
+ORDER BY total_cents DESC, COALESCE(first_bid_at, created_at) ASC
+```
+
+Paid always outranks free because `total_cents` leads. Within the free tier
+every row is 0, so the fallback to `created_at` gives a stable first-come
+order instead of an arbitrary one.
+
+### Keeping the open path safe
+
+Submission is deliberately unauthenticated, so the protections sit elsewhere:
+
+- Nothing on the free path can set a bid amount. Money only ever moves through
+  `applyPaidBid()`.
+- Every listing is one-click reportable, and an unverified one is hidden
+  immediately.
+- Person listings are excluded from indexing via `robots.txt`, so the site does
+  not drift into being a people-search surface.
+- The submit endpoint is rate limited per client, keyed on a **hash** of the IP
+  so the table holds no directly identifying data.
+- Re-adding an existing handle returns the existing listing rather than
+  duplicating it, and a removed listing cannot be re-added.
+
+## Ownership verification
+
+**You can only bid on an account you control.** This is enforced server-side in
+`/api/checkout`, not just in the UI — the form only offers verified handles, but
+the API re-checks the claim on every request regardless.
+
+Two ways to prove it:
+
+**Sign in with the platform (preferred).** OAuth 2.0 with PKCE for X, YouTube
+(via Google) and TikTok. The platform tells us who you are, so nothing has to be
+published or read back. Each provider is inert until its client id and secret are
+set, and the sign-in button says so.
+
+**Publish a one-time code (fallback).** We issue `bidboard-verify-<10 hex>`, you
+put it anywhere in your bio, we read it back. Matching tolerates the ways
+platforms mangle bios — case, whitespace, zero-width characters — but requires
+the full code.
+
+Instagram and LinkedIn are code-only on purpose. Instagram handle verification
+needs the Facebook Graph API against a Business account, behind App Review and
+business verification. LinkedIn *company page* control needs `r_organization_admin`,
+which is partner-gated; plain sign-in only proves who the person is. Neither is
+something a new project can self-serve, so the fallback carries them.
+
+`UNIQUE (platform, handle)` on `account_claims` means one owner per handle and
+first proof wins — a second person proving control of the same account is
+rejected rather than silently taking over the listing.
+
+Verifying also adopts any existing listing for that handle, so accounts listed
+before verification existed can be claimed by their real owner.
+
+### Takedown
+
+`POST /api/listings/report` files a removal request and **immediately hides**
+any listing that is not owner-verified. Unverified listings of someone else's
+account get taken down first and adjudicated second.
+
+### Sessions
+
+An opaque 32-byte token in an httpOnly cookie, looked up in `sessions`. Nothing
+is signed into the cookie, so there is no signing key to leak or rotate.
+
+## Local testing without any platform credentials
+
+Two dev-only seams, both gated on `ALLOW_MOCK_OAUTH=1` and refused when
+`NODE_ENV=production`:
+
+- `GET /api/auth/mock/start?platform=x&handle=foo` creates a verified claim.
+  It calls the same `upsertClaim()` the real callback uses, so exercising it
+  tests the production path rather than a stub.
+- `MOCK_BIO_FILE=/path/to/file` makes the bio fetcher read that file instead of
+  the live profile, which is how the code-challenge flow is tested end to end.
+
+## Production safety
+
+The app **refuses to serve** if it is misconfigured in production
+(`productionConfigProblems()` in `src/lib/config.ts`, invoked from
+`instrumentation.ts` at boot). It checks for a database URL, a live Stripe key
+and webhook secret, an https origin, and that no dev flag leaked into the
+deploy. A bad deploy fails loudly at start rather than quietly at the first
+payment.
+
+Three hazards this closes, all found by actually running a production build:
+
+- **Simulated payments must fail closed.** `SIMULATED_PAYMENTS` used to be
+  derived from "no Stripe key", so a production deploy with a missing or
+  mistyped key would have handed out the #1 position for free. In production it
+  is now always false and checkout returns 503 instead.
+- **`APP_BASE_URL`, not `NEXT_PUBLIC_BASE_URL`.** `NEXT_PUBLIC_*` values are
+  inlined at *build* time, so an origin supplied only at run time is silently
+  ignored and the deploy keeps the build machine's — which sends live customers
+  to a localhost Stripe redirect. Only server code needs the origin, so it is
+  read at run time.
+- **`sitemap.xml` and `robots.txt` are dynamic.** Prerendered, they baked in the
+  build origin; the sitemap also depends on which cities have listings, which
+  changes as they arrive.
+
+See `DEPLOY.md`.
+
 ## Not built yet
 
-Deliberately out of scope for a prototype, and all of it matters before launch:
-
-- **Ownership verification.** Anyone can currently list any handle. Listing a
-  *person's* account on a public ranked board they never opted into is a real
-  moderation and legal problem, unlike listing a product. Platform OAuth or a
-  claim/takedown flow is required, not optional.
-- Refund and removal tooling, plus an admin view for `hidden` / `removed`.
+- Rate limiting on checkout and challenge creation beyond the per-challenge
+  attempt cap.
+- Refund tooling and an admin view for `removal_requests` and hidden listings.
 - Avatar fetching and profile-existence checks at submission time.
-- Rate limiting on checkout creation.
 - Reserved-handle blocklist for well-known accounts.
+- Terms of service and privacy policy — required before taking real money.

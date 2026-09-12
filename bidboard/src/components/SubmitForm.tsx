@@ -1,19 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { PLATFORMS } from "@/lib/platforms";
 
 type Category = { id: number; slug: string; name: string };
+type Claim = { id: string; platform: string; handle: string };
 
 export default function SubmitForm({
   categories,
+  claims,
   suggestedBid,
 }: {
   categories: Category[];
+  claims: Claim[];
   suggestedBid: number;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState(`${claims[0]?.platform}:${claims[0]?.handle}`);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,7 +24,8 @@ export default function SubmitForm({
     setBusy(true);
 
     const fd = new FormData(e.currentTarget);
-    const payload = Object.fromEntries(fd.entries());
+    const [platform, handle] = String(fd.get("account")).split(":");
+    const payload = { ...Object.fromEntries(fd.entries()), platform, handle };
 
     try {
       const res = await fetch("/api/checkout", {
@@ -46,19 +50,20 @@ export default function SubmitForm({
     <form className="panel" onSubmit={onSubmit}>
       {error && <div className="err">{error}</div>}
 
-      <div className="grid2">
-        <div className="field">
-          <label htmlFor="platform">Platform</label>
-          <select id="platform" name="platform" defaultValue="x">
-            {PLATFORMS.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="handle">Handle</label>
-          <input id="handle" name="handle" placeholder="@yourhandle" required />
-          <div className="hint">Paste the @handle or the profile URL.</div>
+      <div className="field">
+        <label htmlFor="account">Account</label>
+        {/* Only verified accounts appear here. The server re-checks the claim
+            regardless, so this select is convenience, not the control. */}
+        <select id="account" name="account" value={selected}
+                onChange={(e) => setSelected(e.target.value)}>
+          {claims.map((c) => (
+            <option key={c.id} value={`${c.platform}:${c.handle}`}>
+              {c.platform} · @{c.handle}
+            </option>
+          ))}
+        </select>
+        <div className="hint">
+          Only verified accounts are listed. <a href="/verify">Verify another →</a>
         </div>
       </div>
 
@@ -84,9 +89,7 @@ export default function SubmitForm({
         <div className="field">
           <label htmlFor="bid">Your bid (USD)</label>
           <input id="bid" name="bid" inputMode="numeric" defaultValue={String(suggestedBid)} required />
-          <div className="hint">
-            Already listed? Enter your new total — you pay only the difference.
-          </div>
+          <div className="hint">Already listed? Enter your new total — you pay only the difference.</div>
         </div>
       </div>
 

@@ -5,7 +5,9 @@ import {
 } from "@/lib/bids";
 import { isPlatform, platformLabel, profileUrlFor } from "@/lib/platforms";
 import { normalizeHandle, planBid, usdToCents, centsToUsd } from "@/lib/rules";
-import { BASE_URL, SIMULATED_PAYMENTS } from "@/lib/config";
+import { BASE_URL, SIMULATED_PAYMENTS, STRIPE_CONFIGURED } from "@/lib/config";
+import { currentUser } from "@/lib/auth";
+import { hasClaim, claimOwner } from "@/lib/verification";
 import { stripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -23,6 +25,32 @@ export async function POST(req: Request) {
 
   const handle = normalizeHandle(String(rawHandle ?? ""));
   if (!handle) return bad("That handle doesn't look valid.");
+
+  // OWNERSHIP GATE.
+  //
+  // Everything below spends money on a handle, so this is the line that has
+  // to hold: a bid is only accepted from the user who has proven control of
+  // that account. Without it, $5 buys a stranger a public ranked listing of
+  // someone else's profile, which is the whole consent problem.
+  const user = await currentUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "Verify the account first.", needsVerification: true },
+      { status: 401 },
+    );
+  }
+  if (!(await hasClaim(user.id, platform, handle))) {
+    const owner = await claimOwner(platform, handle);
+    return NextResponse.json(
+      {
+        error: owner
+          ? "That account is verified by a different user."
+          : `You haven't verified @${handle} on ${platform} yet.`,
+        needsVerification: true,
+      },
+      { status: 403 },
+    );
+  }
 
   const name = String(displayName ?? "").trim().slice(0, 80);
   if (name.length < 2) return bad("Add a display name.");
@@ -57,8 +85,18 @@ export async function POST(req: Request) {
     payerEmail: String(email ?? "").trim() || null,
   });
 
-  // No Stripe key configured: stub the payment so the engine can be exercised
-  // end to end. The code path below is identical to the webhook's.
+  // Fail closed. In production SIMULATED_PAYMENTS is always false, so a
+  // deploy with a missing Stripe key refuses to take bids rather than
+  // handing out rank for nothing.
+  if (!SIMULATED_PAYMENTS && !STRIPE_CONFIGURED) {
+    return NextResponse.json(
+      { error: "Payments are not configured on this deployment." },
+      { status: 503 },
+    );
+  }
+
+  // Development only: stub the payment so the engine can be exercised end to
+  // end. The code path below is identical to the webhook's.
   if (SIMULATED_PAYMENTS) {
     const result = await applyPaidBid({
       eventId: `sim_${randomUUID()}`,

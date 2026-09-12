@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * specific event id to prove the idempotency guard holds.
  */
 export async function POST(req: Request) {
-  if (!ALLOW_DEV_SIMULATE || process.env.NODE_ENV === "production") {
+  if (!ALLOW_DEV_SIMULATE) {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
   }
 
