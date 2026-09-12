@@ -1,11 +1,19 @@
 # BidBoard
 
-A pay-to-rank leaderboard for social accounts, in the shape of
-[outbid.lol](https://outbid.lol) but scoped to a **single commercial vertical**
-with **per-platform boards**.
+A geographic directory of brand social accounts with a pay-to-rank layer on
+top. Browse by country and city, filter by platform and category, and rank by
+what you have paid.
 
-Rank is set by one number: cumulative dollars paid. No algorithm, no editorial,
-no ads.
+Two tiers:
+
+- **Free** — anyone adds an account by pasting a username or profile link. No
+  login, no payment.
+- **Paid** — the *verified owner* bids to rank above the free tier.
+
+That split is the whole design. Gating submission starves a directory's supply
+side, but letting anyone pay to position an account they do not own is exactly
+the abuse the ownership gate exists to stop. So submission is open and only
+*ranking* is gated.
 
 ## Why a vertical instead of a general board
 
@@ -40,13 +48,16 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ```bash
 npm test                 # 21 unit tests: bidding rules, challenge codes, PKCE
-node scripts/verify.mjs  # 26 end-to-end checks against a running server
+node scripts/verify.mjs  # 43 end-to-end checks against a running server
 ```
 
 The end-to-end suite covers the ownership gate (an unverified visitor cannot
 bid; a verified user cannot bid on someone else's handle; a handle cannot be
-claimed twice), the bio-code flow, bid validation, concurrent bids, webhook
-replay, takedown, and click counting.
+claimed twice), the free-listing path (open submission, no self-set bid
+amount, no duplicates, no implied right to bid), geography (city pages,
+filters, paid-above-free ordering, sitemap and robots), the bio-code flow, bid
+validation, concurrent bids, webhook replay, takedown, rate limiting, and
+click counting.
 
 ## The rules
 
@@ -110,6 +121,48 @@ Outbound clicks route through `/go/:id`, are counted per listing per day, and
 are shown on the board. This is not decoration: outbid.lol's repeat five-figure
 bids happened because bidders could point at trials and signups. Without
 receipts you get one round of novelty money and then silence.
+
+## Geography
+
+Listings carry an optional country and city. Three surfaces use it:
+
+- `/` — country, city, platform, category and brand/person filters
+- `/in/<country>/<city>` — a real ranked page per city, the SEO surface
+- `/directory` — index of cities, **populated ones only**
+
+A directory's distribution is long-tail search ("social media agencies in
+mumbai"), not virality. That only works if the pages are real: the sitemap
+lists a city only once it has listings, and category pages only once a city has
+five or more. Publishing a page per city x category upfront would be thousands
+of thin URLs, which hurts rather than helps.
+
+Cities are a curated list ordered by `sort_order`, so the strongest markets
+surface first rather than alphabetically.
+
+### Ranking across the two tiers
+
+```sql
+ORDER BY total_cents DESC, COALESCE(first_bid_at, created_at) ASC
+```
+
+Paid always outranks free because `total_cents` leads. Within the free tier
+every row is 0, so the fallback to `created_at` gives a stable first-come
+order instead of an arbitrary one.
+
+### Keeping the open path safe
+
+Submission is deliberately unauthenticated, so the protections sit elsewhere:
+
+- Nothing on the free path can set a bid amount. Money only ever moves through
+  `applyPaidBid()`.
+- Every listing is one-click reportable, and an unverified one is hidden
+  immediately.
+- Person listings are excluded from indexing via `robots.txt`, so the site does
+  not drift into being a people-search surface.
+- The submit endpoint is rate limited per client, keyed on a **hash** of the IP
+  so the table holds no directly identifying data.
+- Re-adding an existing handle returns the existing listing rather than
+  duplicating it, and a removed listing cannot be re-added.
 
 ## Ownership verification
 

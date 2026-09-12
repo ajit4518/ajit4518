@@ -14,9 +14,10 @@ await client.connect();
 if (reset) {
   await client.query(`
     DROP TABLE IF EXISTS removal_requests, verification_challenges, account_claims,
-      sessions, users, clicks, bids, processed_events, submissions, listings, categories CASCADE;
+      sessions, users, clicks, bids, processed_events, submissions, listings,
+      categories, cities, countries, rate_limits CASCADE;
     DROP TYPE IF EXISTS platform, listing_status, submission_status,
-      claim_method, challenge_status CASCADE;
+      claim_method, challenge_status, entity_type CASCADE;
   `);
   console.log("dropped existing objects");
 }

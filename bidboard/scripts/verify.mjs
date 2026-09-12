@@ -208,6 +208,93 @@ check("redirect is a 302", redirect.status === 302, `got ${redirect.status}`);
 check("outbound URL is clean", (redirect.headers.get("location") ?? "").endsWith(`/${seedListing.handle}`));
 check("click was counted", Number(c1.rows[0].n) === Number(c0.rows[0].n) + 1);
 
+// ----------------------------------------------------------- free listings
+section("free listing (no account)");
+
+const anonAdd = actor();
+const freeHandle = `free${uniq()}`;
+const mumbai = (await client.query(
+  "SELECT id FROM cities WHERE country_code='IN' AND slug='mumbai'")).rows[0].id;
+
+const added = await anonAdd.post("/api/listings/add", {
+  platform: "instagram", handle: freeHandle, displayName: "Free Co",
+  categoryId: catId, cityId: mumbai, entityType: "brand",
+});
+check("anyone can add a listing with no account", added.status === 200, added.body?.error);
+check("it is created at zero", (await total("instagram", freeHandle)) === 0);
+
+const dupe = await anonAdd.post("/api/listings/add", {
+  platform: "instagram", handle: freeHandle, displayName: "Free Co Again",
+  categoryId: catId, cityId: mumbai, entityType: "brand",
+});
+const dupeCount = await client.query(
+  "SELECT COUNT(*)::int n FROM listings WHERE platform='instagram' AND handle=$1", [freeHandle]);
+check("re-adding does not duplicate", dupe.status === 200 && dupeCount.rows[0].n === 1);
+
+// A free submission must not be able to seed a balance and rank for free.
+const bribe = await anonAdd.post("/api/listings/add", {
+  platform: "instagram", handle: `bribe${uniq()}`, displayName: "Bribe Co",
+  categoryId: catId, cityId: mumbai, entityType: "brand",
+  total_cents: 999999, totalCents: 999999, bid: "9999",
+});
+const bribed = await client.query(
+  "SELECT total_cents FROM listings WHERE display_name='Bribe Co' ORDER BY created_at DESC LIMIT 1");
+check("a free submission cannot set its own bid amount",
+  bribe.status === 200 && Number(bribed.rows[0].total_cents) === 0,
+  `total_cents=${bribed.rows[0]?.total_cents}`);
+
+const unverifiedBid = await anonAdd.post("/api/checkout", {
+  platform: "instagram", handle: freeHandle, displayName: "Free Co",
+  categoryId: catId, bid: "500",
+});
+check("adding for free does not grant the right to bid", unverifiedBid.status === 401);
+
+// -------------------------------------------------------------- geo surface
+section("geography");
+
+const cityPage = await fetch(`${BASE}/in/india/mumbai`);
+const cityHtml = await cityPage.text();
+check("a populated city page renders", cityPage.status === 200);
+check("it shows that city's listings", cityHtml.includes("Paper Route"));
+check("it excludes other cities", !cityHtml.includes("Northlane"));
+
+const paidFirst = cityHtml.indexOf("Paper Route");
+const freeLater = cityHtml.indexOf("Tilework");
+check("paid listings rank above free ones",
+  paidFirst > -1 && freeLater > -1 && paidFirst < freeLater);
+
+const unknownCity = await fetch(`${BASE}/in/india/atlantis`);
+check("an unknown city 404s", unknownCity.status === 404, `got ${unknownCity.status}`);
+
+const filtered = await (await fetch(`${BASE}/?country=india&city=mumbai`)).text();
+check("board country+city filter works",
+  filtered.includes("Paper Route") && !filtered.includes("Northlane"));
+
+const dir = await (await fetch(`${BASE}/directory`)).text();
+check("directory lists populated cities", dir.includes("Mumbai") && dir.includes("London"));
+check("directory hides empty cities", !dir.includes("Ahmedabad"));
+
+const sitemap = await (await fetch(`${BASE}/sitemap.xml`)).text();
+check("sitemap includes a populated city", sitemap.includes("/in/india/mumbai"));
+check("sitemap omits empty cities", !sitemap.includes("/in/india/ahmedabad"));
+
+const robots = await (await fetch(`${BASE}/robots.txt`)).text();
+check("robots keeps person listings out of the index", robots.includes("type=person"));
+
+// ------------------------------------------------------------- rate limiting
+section("rate limiting the open submit path");
+
+const flood = actor();
+let blocked = false;
+for (let i = 0; i < 24; i++) {
+  const r = await flood.post("/api/listings/add", {
+    platform: "x", handle: `flood${uniq()}${i}`, displayName: `Flood ${i}`,
+    categoryId: catId, entityType: "brand",
+  });
+  if (r.status === 429) { blocked = true; break; }
+}
+check("a flood of submissions is cut off", blocked);
+
 console.log(failures === 0 ? "\nall checks passed\n" : `\n${failures} check(s) failed\n`);
 await client.end();
 process.exit(failures === 0 ? 0 : 1);

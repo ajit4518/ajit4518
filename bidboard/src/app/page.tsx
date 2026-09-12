@@ -1,41 +1,48 @@
 import Link from "next/link";
+import Board from "@/components/Board";
 import { getBoard, getCategories, getStats } from "@/lib/bids";
-import { PLATFORMS, isPlatform, platformLabel } from "@/lib/platforms";
+import { getCities, getCountries } from "@/lib/geo";
+import { PLATFORMS, isPlatform } from "@/lib/platforms";
 import { centsToUsd } from "@/lib/rules";
 import { VERTICAL, SIMULATED_PAYMENTS } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
-
-// The board is identical for every visitor, so it caches trivially at the
-// edge. A short revalidate window is what lets one Postgres row-store serve
-// a traffic spike: the DB is only touched on bids, not on reads.
 export const revalidate = 5;
 
-type SP = Promise<{ platform?: string; category?: string; window?: string }>;
+type SP = Promise<{
+  platform?: string; category?: string; country?: string;
+  city?: string; type?: string; window?: string;
+}>;
 
 function chip(href: string, label: string, on: boolean) {
-  return (
-    <Link key={href + label} className="chip" data-on={on} href={href}>
-      {label}
-    </Link>
-  );
+  return <Link key={href + label} className="chip" data-on={on} href={href}>{label}</Link>;
 }
 
 export default async function Home({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const platform = isPlatform(sp.platform) ? sp.platform : null;
   const categorySlug = sp.category ?? null;
+  const countrySlug = sp.country ?? null;
+  const citySlug = sp.city ?? null;
+  const entityType = sp.type === "person" ? "person" : sp.type === "brand" ? "brand" : null;
   const window = sp.window === "today" ? "today" : "all";
 
-  const [rows, categories, stats] = await Promise.all([
-    getBoard({ platform, categorySlug, window }),
+  const [rows, categories, countries, stats] = await Promise.all([
+    getBoard({ platform, categorySlug, countrySlug, citySlug, entityType, window }),
     getCategories(),
+    getCountries(),
     getStats(),
   ]);
 
+  const selectedCountry = countries.find((c) => c.slug === countrySlug) ?? null;
+  const cities = selectedCountry ? await getCities(selectedCountry.code) : [];
+
   const qs = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams();
-    const merged = { platform, category: categorySlug, window: window === "all" ? null : window, ...patch };
+    const merged = {
+      platform, category: categorySlug, country: countrySlug, city: citySlug,
+      type: entityType, window: window === "all" ? null : window, ...patch,
+    };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const s = p.toString();
     return s ? `/?${s}` : "/";
@@ -50,21 +57,14 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
         </div>
         <p className="blurb">{VERTICAL.blurb}</p>
         <div className="statbar">
-          <div className="stat">
-            <div className="n">{centsToUsd(stats.totalCents)}</div>
-            <div className="l">Total bid</div>
-          </div>
-          <div className="stat">
-            <div className="n">{stats.listings}</div>
-            <div className="l">Listings</div>
-          </div>
-          <div className="stat">
-            <div className="n">{centsToUsd(stats.topCents)}</div>
-            <div className="l">Top spot</div>
-          </div>
+          <div className="stat"><div className="n">{centsToUsd(stats.totalCents)}</div><div className="l">Total bid</div></div>
+          <div className="stat"><div className="n">{stats.listings}</div><div className="l">Listings</div></div>
+          <div className="stat"><div className="n">{centsToUsd(stats.topCents)}</div><div className="l">Top spot</div></div>
         </div>
         <nav className="top">
-          <Link href="/submit">Get listed →</Link>
+          <Link href="/add">Add an account →</Link>
+          <Link href="/directory">Browse cities</Link>
+          <Link href="/submit">Bid to rank</Link>
           <Link href="/rules">Rules</Link>
         </nav>
       </header>
@@ -72,8 +72,7 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
       {SIMULATED_PAYMENTS && (
         <div className="notice">
           <strong>Simulated payment mode.</strong> No <code>STRIPE_SECRET_KEY</code> is set, so
-          checkout is stubbed and bids apply instantly. Add Stripe test keys to{" "}
-          <code>.env</code> to exercise the real webhook path.
+          checkout is stubbed and bids apply instantly.
         </div>
       )}
 
@@ -83,6 +82,24 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
           {chip(qs({ window: null }), "All-time", window === "all")}
           {chip(qs({ window: "today" }), "Today", window === "today")}
         </div>
+        <div className="filterrow">
+          <span className="lbl">Type</span>
+          {chip(qs({ type: null }), "All", !entityType)}
+          {chip(qs({ type: "brand" }), "Brands", entityType === "brand")}
+          {chip(qs({ type: "person" }), "People", entityType === "person")}
+        </div>
+        <div className="filterrow">
+          <span className="lbl">Country</span>
+          {chip(qs({ country: null, city: null }), "All", !countrySlug)}
+          {countries.map((c) => chip(qs({ country: c.slug, city: null }), c.name, countrySlug === c.slug))}
+        </div>
+        {cities.length > 0 && (
+          <div className="filterrow">
+            <span className="lbl">City</span>
+            {chip(qs({ city: null }), "All", !citySlug)}
+            {cities.map((c) => chip(qs({ city: c.slug }), c.name, citySlug === c.slug))}
+          </div>
+        )}
         <div className="filterrow">
           <span className="lbl">Platform</span>
           {chip(qs({ platform: null }), "All", !platform)}
@@ -95,35 +112,12 @@ export default async function Home({ searchParams }: { searchParams: SP }) {
         </div>
       </div>
 
-      <div className="board">
-        {rows.length === 0 && (
-          <div className="empty">
-            Nothing on this board yet. <Link href="/submit">Be first for $5 →</Link>
-          </div>
-        )}
-        {rows.map((r, i) => (
-          <a className="row" data-top={i === 0} key={r.id} href={`/go/${r.id}`} rel="nofollow noopener">
-            <div className="rank">{i + 1}</div>
-            <div className="who">
-              <div className="name">{r.display_name}</div>
-              <div className="meta">
-                {platformLabel(r.platform)} · @{r.handle} · {r.category_name}
-              </div>
-              {r.tagline && <div className="tagline">{r.tagline}</div>}
-            </div>
-            <div className="amt">
-              <div className="v">{centsToUsd(Number(r.total_cents))}</div>
-              <div className="c">
-                {Number(r.clicks).toLocaleString()} {Number(r.clicks) === 1 ? "click" : "clicks"}
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
+      <Board rows={rows} />
 
       <footer>
-        Rank is set by cumulative dollars paid, nothing else. Ties keep their original
-        order — the older bid stays higher.
+        Paid listings rank above free ones, by cumulative dollars paid. Free listings
+        follow, oldest first. Anyone can <Link href="/add">add an account</Link>; only a
+        verified owner can bid.
       </footer>
     </div>
   );
