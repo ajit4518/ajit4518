@@ -27,7 +27,14 @@ studios, newsletter and course operators). For them an inbound lead is worth
 four figures, so a four-figure bid has arithmetic behind it rather than ego.
 Change `src/lib/config.ts` and `db/seed.sql` to retarget the vertical.
 
-## Running it
+## Deploying
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ajit4518/ajit4518&root-directory=bidboard&project-name=agencyboard&repository-name=agencyboard&env=DATABASE_URL,APP_BASE_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET&envDescription=Postgres+URL,+your+public+https+origin,+and+live+Stripe+keys.+The+app+refuses+to+start+without+all+four.&envLink=https://github.com/ajit4518/ajit4518/blob/master/bidboard/DEPLOY.md)
+
+See [DEPLOY.md](./DEPLOY.md) — roughly fifteen minutes. Merge the open PR
+first; the button deploys the default branch.
+
+## Running it locally
 
 ```bash
 cp .env.example .env          # defaults work against a local Postgres
