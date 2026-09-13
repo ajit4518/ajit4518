@@ -1,0 +1,157 @@
+name: bidboard CI
+
+on:
+  push:
+    branches: [master]
+    paths: ['bidboard/**', '.github/workflows/bidboard-ci.yml']
+  pull_request:
+    paths: ['bidboard/**', '.github/workflows/bidboard-ci.yml']
+
+# A newer push to the same branch makes an in-flight run pointless.
+concurrency:
+  group: bidboard-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: unit, build, end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: bidboard
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bidboard
+          POSTGRES_PASSWORD: bidboard
+          POSTGRES_DB: bidboard
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://bidboard:bidboard@localhost:5432/bidboard
+      APP_BASE_URL: http://localhost:3000
+      # The end-to-end suite drives the verification flows through these dev-only
+      # seams. They are refused when NODE_ENV=production, so they cannot leak
+      # into a deployment — see productionConfigProblems() in src/lib/config.ts.
+      ALLOW_DEV_SIMULATE: '1'
+      ALLOW_MOCK_OAUTH: '1'
+      MOCK_BIO_FILE: /tmp/bidboard-mock-bio.txt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: bidboard/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Database schema and seed
+        run: npm run db:reset
+
+      - name: Build (also typechecks)
+        run: npm run build
+
+      # `next dev` and `next build` write to the same .next directory, and a
+      # leftover production build makes the dev server serve 500s. Clearing it
+      # keeps the end-to-end run deterministic.
+      - name: End-to-end
+        run: |
+          rm -rf .next
+          npm run dev > /tmp/dev.log 2>&1 &
+
+          # Poll in a loop rather than relying on curl --retry-connrefused,
+          # which gives up immediately on a refused connection in some builds.
+          for _ in $(seq 1 90); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:3000/ 2>/dev/null)" = "200" ] && break
+            sleep 1
+          done
+          curl -sS -o /dev/null --max-time 10 http://localhost:3000/ || {
+            echo "::error::dev server never became ready"; cat /tmp/dev.log; exit 1;
+          }
+
+          node scripts/verify.mjs
+
+      - name: Dev server log (on failure)
+        if: failure()
+        run: cat /tmp/dev.log || true
+
+  production-config:
+    name: production refuses to start misconfigured
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: bidboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: bidboard/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgres://unused:unused@localhost:5432/unused
+
+      # The most damaging way this app can be misconfigured is a production
+      # deploy with no Stripe key, which used to hand out the #1 position for
+      # free. Assert the guard still refuses rather than trusting it stays.
+      - name: A misconfigured production start must fail
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgres://unused:unused@localhost:5432/unused
+          APP_BASE_URL: http://localhost:3000
+          ALLOW_MOCK_OAUTH: '1'
+        run: |
+          set +e
+          npx next start -p 4123 > /tmp/prod.log 2>&1 &
+          PID=$!
+
+          # Wait on the log, not on HTTP. A refusing server still binds the
+          # port and answers 500, so an HTTP probe races; the log line is
+          # deterministic.
+          for _ in $(seq 1 60); do
+            grep -qE "Refusing to start|Ready in" /tmp/prod.log && break
+            sleep 1
+          done
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:4123/)
+          kill -9 $PID 2>/dev/null
+          echo "--- server log ---"; cat /tmp/prod.log
+
+          if ! grep -q "Refusing to start" /tmp/prod.log; then
+            echo "::error::production config guard did not fire"; exit 1
+          fi
+          for key in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET APP_BASE_URL ALLOW_MOCK_OAUTH; do
+            grep -q "$key" /tmp/prod.log || { echo "::error::guard did not flag $key"; exit 1; }
+          done
+          if [ "$code" = "200" ]; then
+            echo "::error::misconfigured production server served a page (got $code)"; exit 1
+          fi
+          echo "guard fired correctly; server returned $code instead of serving"
